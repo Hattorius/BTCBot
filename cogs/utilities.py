@@ -13,6 +13,7 @@ import datetime
 from decimal import Decimal
 import time
 import ipc
+from constants import ITEM_DICT, write_items
 
 
 class Utilities(commands.Cog):
@@ -71,7 +72,7 @@ class Utilities(commands.Cog):
 			user = ""
 		await ctx.channel.send("Welcome to our community Bitcoin chat" + user + "! Please review the <#" + os.getenv('RULES_CHANNEL') + "> while you're here; primarily no altcoin, stock, or off topic discussion. If you’re new to bitcoin, please check out https://lopp.net/bitcoin.html, a community curated list of educational resources, tools, and information.")
 
-	@commands.command()
+	@commands.command(aliases=["x", "ex", "exchange"])
 	async def exchanges(self, ctx, *args):
 		exchangeDic = {
 			"p2p": "Bisq, Robosats, HodlHodl, Vexl, Peach Bitcoin",
@@ -109,7 +110,7 @@ class Utilities(commands.Cog):
 			"new zealand": "Independent Reserve, Kiwi-coin, Mine Digital"
 			}
 		arg = ""
-		for a in args[0]:
+		for a in args:
 			arg += str(a) + " "
 		arg = arg[0:len(arg)-1]
 		if arg.lower() in exchangeDic:
@@ -123,18 +124,6 @@ class Utilities(commands.Cog):
 				keys += k + ", "
 			keys = keys[0:len(keys)-2]
 			await ctx.channel.send("Available options: " + keys)
-
-	@commands.command()
-	async def exchange(self, ctx, *args):
-		await Utilities(self).exchanges(self, ctx, args)
-
-	@commands.command()
-	async def ex(self, ctx, *args):
-		await Utilities(self).exchanges(self, ctx, args)
-
-	@commands.command()
-	async def x(self, ctx, *args):
-		await Utilities(self).exchanges(self, ctx, args)
 
 	@commands.command(aliases=["w", "wallet"])
 	async def wallets(self, ctx, *args):
@@ -185,14 +174,10 @@ class Utilities(commands.Cog):
 		msg = "\n<https://github.com/bitcoin/bitcoin> <- the repo\n<https://web.libera.chat/#bitcoin-core-dev> <- the irc\n<https://github.com/bitcoin-core/bitcoin-devwiki/wiki/General-IRC-meeting> <- the dev meetings\n<https://bitcoincore.reviews/> the PR review club meetings\n<https://bitcoin.stackexchange.com> <- the stack exchange\n<https://lists.linuxfoundation.org/pipermail/bitcoin-dev/> <- the general dev mailinglist\n<https://lists.linuxfoundation.org/pipermail/bitcoin-core-dev/> <- core dev mailinglist\n<https://bitcoinops.org/en/newsletters/> <- optech newsletters dev summary\n<https://bitcoincoreslack.herokuapp.com/> <- core slack\n<https://delvingbitcoin.org/> <- technical discussion community\n<https://bitcoin.design/guide/> <- the development design guide\n<https://www.bitcointech.wiki/editor> <- the online transaction editor\n<https://bitcoincore.academy/> <- Bitcoin Core Onboarding\n<https://github.com/bitcoin/bips> <- Bitcoin Improvement Proposals"
 		await ctx.channel.send(msg)
 
-	@commands.command()
+	@commands.command(aliases=["jobs"])
 	async def job(self, ctx, *args):
 		msg = "Bitcoin job boards and resources:\n<https://cash.app/careers>\n<https://reddit.com/r/Jobs4Bitcoins>\n<https://strike.me/jobs>\n<https://www.bitmex.com/careers>\n<https://angel.co/company/river-financial/jobs>\n<https://bitcoinerjobs.co/>"
 		await ctx.channel.send(msg)
-
-	@commands.command()
-	async def jobs(self, ctx, *args):
-		await Utilities(self).job(self, ctx, args)
 
 	@commands.command()
 	async def quantum(self, ctx, *args):
@@ -260,7 +245,7 @@ class Utilities(commands.Cog):
 		if len(args) <= 1:
 			await channel.send("Please include a message with your modmail. ex. `!modmail You moderators are the worst. I hope you fall down the stairs and break your legs, and your stairs.`")
 
-	@commands.command()
+	@commands.command(aliases=["tool"])
 	async def tools(self, ctx, *args):
 		msg = '''
 <https://www.bitcointech.wiki/editor> <- Transaction Editor
@@ -412,7 +397,7 @@ The tip of the mempool ({range01}MB) ranges between {range0bottomMB} sat/vbyte a
 
 
 	# Fetches Bitcoin mempool info from blockstreams mempool
-	@commands.command()
+	@commands.command(aliases=["fees"])
 	async def fee(self, ctx, *args):
 		api = "https://blockstream.info/api/mempool"
 		r = requests.get(api)
@@ -454,10 +439,6 @@ Low Priority (6 blocks+/1h+) = {low} sat/vbyte
 Very Low Priority (144 blocks+/1d+) = {vlow} sat/vbyte
 ```'''.format(high=high, medium=medium, low=low, vlow=vlow)
 		await ctx.send(message_string)
-
-	@commands.command()
-	async def fees(self, ctx, *args):
-		await Utilities(self).fee(self, ctx, args)
 
 	@commands.command()
 	async def tipUser(self, ctx, user: discord.User, amount, *args):
@@ -713,6 +694,101 @@ Very Low Priority (144 blocks+/1d+) = {vlow} sat/vbyte
 				net_income)
 
 		await ctx.send(message_string)
+
+	@commands.command()
+	async def additem(self, ctx, *args):
+		if not (hasattr(ctx.message.author, 'roles') and any(str(role.id) in os.getenv('EDIT_DATA_ROLES') for role in ctx.message.author.roles)):
+			await ctx.send("No permission to use the additem command.")
+			return
+		if len(args) < 3:
+			await ctx.send("The additem command requires 3 to 5 parameters: the calling code of the item (3 characters please), the full name of the item (in quotes), the price of the item in USD, an emoji for the item without colons : bracing it just the keyword (optional), and whether the item should be default priced as a single item or not (optional). Example: `"+os.getenv('BOT_PREFIX')+"additem mac \"McDonalds Big Mac\" 5.71 hamburger single`")
+			return
+		if len(args[0]) > 4 or len(args[0]) < 3:
+			await ctx.send("Please use a calling code that is 3-4 characters.")
+			return
+		try:
+			float(args[2])
+		except:
+			await ctx.send("The third parameter must be a decimal number representing USD value of the item")
+			return
+		if args[0].lower() in ITEM_DICT:
+			await ctx.send("The calling code " + args[0] + " already exists. Either use the `edititem` command or choose a different calling code.")
+			return
+		
+		single = False
+		if args[len(args)-1] == "single":
+			single = True
+			
+		emoji = ""
+		if (len(args) > 3 and not single) or (len(args) > 4 and single):
+			emoji = args[3]
+
+		for arg in args:
+			if len(arg) > 50:
+				await ctx.send("Please keep parameters below 50 characters each")
+				return
+
+		ITEM_DICT.update({args[0].lower(): { "cost": float(args[2]), "name": args[1], "emoji": ":" + emoji + ":", "single": single, "last_edited_by": ctx.message.author.name}})
+		write_items(ITEM_DICT)
+
+		await ctx.send("Successfully added item: " + args[1] + " with value $" + args[2])
+
+	@commands.command()
+	async def edititem(self, ctx, *args):
+		if not (hasattr(ctx.message.author, 'roles') and any(str(role.id) in os.getenv('EDIT_DATA_ROLES') for role in ctx.message.author.roles)):
+			await ctx.send("No permission to use the edititem command.")
+			return
+		if len(args) < 3:
+			await ctx.send("The edititem command requires 3 to 5 parameters: the calling code of the item (3 characters please), the full name of the item (in quotes), the price of the item in USD, an emoji for the item without colons : bracing it just the keyword (optional), and whether the item should be default priced as a single item or not (optional). Example: `"+os.getenv('BOT_PREFIX')+"edititem mac \"McDonalds Big Mac\" 5.71 hamburger single`")
+			return
+		if len(args[0]) > 4 or len(args[0]) < 3:
+			await ctx.send("Please use a calling code that is 3-4 characters.")
+			return
+		try:
+			float(args[2])
+		except:
+			await ctx.send("The third parameter must be a decimal number representing USD value of the item")
+			return
+		if not args[0].lower() in ITEM_DICT:
+			await ctx.send("The calling code " + args[0] + " doesnt exist yet. Either use the `additem` command or choose an existing calling code.")
+			return
+		
+		single = False
+		if args[len(args)-1] == "single":
+			single = True
+			
+		emoji = ""
+		if (len(args) > 3 and not single) or (len(args) > 4 and single):
+			emoji = args[3]
+
+		for arg in args:
+			if len(arg) > 50:
+				await ctx.send("Please keep parameters below 50 characters each")
+				return
+		ITEM_DICT[args[0].lower()] = { "cost": float(args[2]), "name": args[1], "emoji": ":" + emoji + ":", "single": single, "last_edited_by": ctx.message.author.name}
+		write_items(ITEM_DICT)
+
+		await ctx.send("Successfully edited item: " + args[1] + " with value $" + args[2])
+
+	@commands.command()
+	async def editprice(self, ctx, *args):
+		if not (hasattr(ctx.message.author, 'roles') and any(str(role.id) in os.getenv('EDIT_DATA_ROLES') for role in ctx.message.author.roles)):
+			await ctx.send("No permission to use the editprice command.")
+			return
+		if len(args) != 2:
+			await ctx.send("The editprice command requires 2 parameters, the item code to edit and the price to change it to. ex. `"+os.getenv('BOT_PREFIX')+"editprice mac 3.99`")
+			return
+		if not args[0].lower() in ITEM_DICT:
+			await ctx.send("The calling code " + args[0] + " doesnt exist yet. Either use the `additem` command or choose an existing calling code.")
+			return
+		try:
+			float(args[1])
+		except:
+			await ctx.send("The second parameter must be a decimal number representing USD value of the item")
+			return
+		ITEM_DICT[args[0].lower()]["cost"] = float(args[1])
+
+		await ctx.send("Successfully edited item: " + ITEM_DICT[args[0].lower()]["name"] + " with value $" + args[1])
 
 async def setup(bot):
 	await bot.add_cog(Utilities(bot))

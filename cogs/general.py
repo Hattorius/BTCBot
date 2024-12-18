@@ -3,7 +3,7 @@ import math
 import random
 
 import BitcoinAPI as api
-from constants import ITEM_DICT, CURRENCY_FORMAT_DICT, BLACKLIST, BITCOIN_IN_SATS, FUN_FACTS, REMOVE_HELP, CHART_TYPES
+from constants import ITEM_DICT, CURRENCY_FORMAT_DICT, BITCOIN_IN_SATS, FUN_FACTS, REMOVE_HELP, CHART_TYPES
 from operator import truediv
 import os
 from discord.ext import commands
@@ -145,17 +145,21 @@ class General(commands.Cog):
 	# 	await ctx.send(format_string.format(price/wage))
 
 	# Fetches Bitcoin all time high (ATH) price
-	# @commands.command()
-	# async def ath(self, ctx, *args):
-	# 	if(len(args) == 0):
-	# 		ath, error = api.get_bitcoin_ath("usd")
-	# 	else:
-	# 		ath, error = api.get_bitcoin_ath(args[0].lower())
-	# 	if error:
-	# 		return await ctx.send(error)
+	@commands.command()
+	async def ath(self, ctx, *args):
+		if len(args) == 0:
+			ath_str, ath, error = api.get_bitcoin_ath("usd")
+		elif len(args) == 1 and args[0].lower() in ITEM_DICT:
+			ath_str, ath, error = api.get_bitcoin_ath("usd")
+			ath_str = "{:,.2f}".format(ath / ITEM_DICT[args[0].lower()]["cost"]) + ITEM_DICT[args[0].lower()]["emoji"] + " " + ITEM_DICT[args[0].lower()]["name"]
+		else:
+			arg = args[0].lower()
+			ath_str, ath, error = api.get_bitcoin_ath(arg)
+		if error:
+			return await ctx.send(error)
 
-	# 	message_string = f"**Bitcoin ATH** is currently **{ath}**"
-	# 	await ctx.send(message_string)
+		message_string = f"**Bitcoin ATH** is currently **{ath_str}**"
+		await ctx.send(message_string)
 
 	# @staticmethod
 	# def get_fact():
@@ -225,7 +229,7 @@ class General(commands.Cog):
 			if _args[1] == unit[0]:
 				arg1Formatted = unit[2]
 
-		message_string = _args[0] + " " + arg1Formatted + " is equal to:"
+		message_string = "**" + _args[0] + " " + arg1Formatted + "** is equal to:"
 		_args.remove(_args[1])
 		for currency in data_rates['data']:
 			if currency['symbol'].upper() == "BTC":
@@ -243,20 +247,20 @@ class General(commands.Cog):
 		for item in ITEM_DICT:
 			if item.upper() == sourceCurrency.upper():
 				sourceCurrencyRate = ITEM_DICT[item]["cost"]
-				message_string = _args[0] + " " + ITEM_DICT[item]["name"] + " " + ITEM_DICT[item]["emoji"] + " is equal to:"
+				message_string = "**" +_args[0] + " " + ITEM_DICT[item]["name"] + "** " + ITEM_DICT[item]["emoji"] + " is equal to:"
 			elif item.upper() in _args:
 				comparisons.append([ITEM_DICT[item]["name"] + " " + ITEM_DICT[item]["emoji"], ITEM_DICT[item]["cost"]])
 
 		for comparison in comparisons:
 			val = sourceCurrencyRate * float(_args[0]) / comparison[1]
 			if val > 0.01:
-				message_string += " " + '{:,.2f}'.format(val) + " " + comparison[0] + ","
+				message_string += " **" + '{:,.2f}'.format(val) + " " + comparison[0] + "**,"
 			else:
-				message_string += " " + '{:,.8f}'.format(val) + " " + comparison[0] + ","
+				message_string += " **" + '{:,.8f}'.format(val) + " " + comparison[0] + "**,"
 
 		message_string = message_string[:len(message_string)-1]
 
-		if len(comparisons) == 0:
+		if len(comparisons) == 0 or sourceCurrencyRate == 0:
 			message_string = "Unable to find the requested currencies for conversion."
 
 		await ctx.send(message_string)
